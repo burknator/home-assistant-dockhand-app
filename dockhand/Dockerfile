@@ -1,16 +1,34 @@
 # Stage 1 — extract Dockhand artifacts
-FROM fnsys/dockhand:v1.0.29 AS dockhand
+FROM fnsys/dockhand:v1.0.55 AS dockhand
 
 # Stage 2 — HA Debian base (glibc, s6-overlay, bashio)
-FROM ghcr.io/home-assistant/base-debian:trixie-2026.04.0
+FROM ghcr.io/home-assistant/base-debian:trixie-2026.10.3
+
+# Add Docker's official GPG key and apt repository
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl \
+    && install -m 0755 -d /etc/apt/keyrings \
+    && curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc \
+    && chmod a+r /etc/apt/keyrings/docker.asc \
+    && tee /etc/apt/sources.list.d/docker.sources <<EOF
+Types: deb
+URIs: https://download.docker.com/linux/debian
+Suites: $(. /etc/os-release && echo "$VERSION_CODENAME")
+Components: stable
+Architectures: $(dpkg --print-architecture)
+Signed-By: /etc/apt/keyrings/docker.asc
+EOF
 
 # Install nginx, docker-cli, and Node.js 24 (NodeSource)
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        curl \
-        gnupg \
+        git \
         nginx \
-        docker.io \
+        docker-ce \
+        docker-ce-cli \
+        containerd.io \
+        docker-buildx-plugin \
+        docker-compose-plugin \
     && curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
     && rm -rf /var/lib/apt/lists/*
@@ -32,9 +50,3 @@ ENV DATA_DIR=/data \
     PORT=3000 \
     HOST=127.0.0.1 \
     NODE_ENV=production
-
-LABEL \
-    org.opencontainers.image.title="Home Assistant App: Dockhand" \
-    org.opencontainers.image.description="Modern Docker management UI for Home Assistant." \
-    org.opencontainers.image.source="https://github.com/alexschwantes/hassio-dockhand" \
-    org.opencontainers.image.licenses="Apache License 2.0"\
